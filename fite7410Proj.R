@@ -10,21 +10,30 @@ library(corrplot)
 install.packages('PerformanceAnalytics')
 library(PerformanceAnalytics)
 library(knitr)
-#安装VIM和mice包
+#安装VIM和mice�?
 install.packages(c("VIM","mice")) 
-# 载入VIM和mice包
+# 载入VIM和mice�?
 library(VIM)
 library(mice)
 install.packages('Hmisc')
+install.packages("tensr")
+install.packages("DescTools")
+install.packages("DMwR")
 library(Hmisc)
-setwd("C:/Users/70886/Desktop")
+library("mice")
+library("tensr")
+library(DescTools)
+library(DMwR)
+library(ROSE)
+
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 path = "./enron.csv"
 dataset = read.csv(path)
 # Load the data
 #dataset = read.csv("/Users/hezhihao/hku-work/Financial Fraud/dataset/enron.csv")
 
 #1 EDA part
-dim(dataset)  #查看数据行列数
+dim(dataset)  #查看数据行列�?
 summary(dataset)
 str(dataset)
 
@@ -49,9 +58,9 @@ ggplot(data =dataset, aes(x= factor(poi),
 
 
 #we can distribute it into 3 categories:
-#Financial : [‘salary’, ‘bonus’, ‘long_term_incentive’, ‘deferred_income’, ‘deferral_payments’, ‘loan_advances’, ‘other’, ‘expenses’, ‘director_fees’]
-#Stock : [‘exercised_stock_options’, ‘restricted_stock’, ‘restricted_stock_deferred’]
-#Total Payments : [‘total_payments’,’total_stock_value’]
+#Financial : [‘salary�?, ‘bonus�?, ‘long_term_incentive�?, ‘deferred_income�?, ‘deferral_payments�?, ‘loan_advances�?, ‘other�?, ‘expenses�?, ‘director_fees’]
+#Stock : [‘exercised_stock_options�?, ‘restricted_stock�?, ‘restricted_stock_deferred’]
+#Total Payments : [‘total_payments�?,’total_stock_value’]
 
 #view the NAN distribution
 dataset[!complete.cases(dataset),]
@@ -60,18 +69,60 @@ aggr(dataset,prop=FALSE,numbers=T)
 
 # insert mean value to each column that is important
 newdata<-dataset
-# newdata$salary <- impute(newdata$salary,median)
-# newdata$bonus <- impute(newdata$bonus,median)
-# newdata$deferral_payments <- impute(newdata$deferral_payments,median)
-# newdata$total_payments <- impute(newdata$total_payments,median)
-# newdata$restricted_stock_deferred <- impute(newdata$restricted_stock_deferred,median)
-# newdata$deferred_income <- impute(newdata$deferred_income,median)
-# newdata$total_stock_value <- impute(newdata$total_stock_value,median)
-# newdata$expenses <- impute(newdata$expenses,median)
-# newdata$exercised_stock_options <- impute(newdata$exercised_stock_options,median)
-# newdata$long_term_incentive <- impute(newdata$long_term_incentive,median)
-# newdata$restricted_stock <- impute(newdata$restricted_stock,median)
-# newdata$loan_advances <- impute(newdata$loan_advances,median)
+
+library(data.table)
+dim(newdata)
+sum(is.na(newdata))
+dft <- data.table(newdata)
+
+
+#2 Missing value Handling
+#Remove employee with >= 17 attributes with missing values
+dim(dft)
+removeEmp = c()
+res = 0
+sum(is.na(dft))
+dim(dft)
+for (row in 1:146){
+  k <- sum(is.na(dft[row]))
+  res = res+k
+  if(sum(is.na(dft[row]))>=17) {
+    removeEmp <- append(removeEmp,row)
+  }
+}
+print(res)
+length(removeEmp)
+if (length(removeEmp) !=0){
+  dft <- dft[-removeEmp]
+}
+
+
+#Remove attribute which have so many NAN value(>75%) ”deferral_payments�?, “loan_advances�?, ”restricted_stock_deferred�?, ”director_fees�?
+threshold = 0.75*dim(dft)[1]
+dft <- as.data.frame(dft)
+dim(dft)
+dft <- dft[,(colSums(is.na(dft)) < 123)]
+dim(a)
+md.pattern(a)
+naCols = colSums(is.na(dft))
+shres = sd(naCols)+mean(naCols)
+naCols[naCols>sd(naCols)
+       +mean(naCols)]
+l <- Large(naCols,5)
+newdata <- dft
+
+# MICE, solve missing data
+
+naCols <- colSums(is.na(newdata))
+naCols[naCols!=0]
+attributes(naCols)
+summary(newdata)
+processedData <- mice(newdata,m=5,maxit=50,meth='mean')
+processedData <- complete(processedData,3)
+summary(processedData)
+colSums(is.na(processedData))
+
+
 # 
 # 
 # salary_dis <- aggregate(x=newdata[c('salary')], by = list(newdata$poi), FUN=mean)
@@ -95,39 +146,49 @@ newdata<-dataset
 #from the above analysis, we could guess person of interest tend to have the higher values comparing to the non-poi's persons.
 
 
-library(data.table)
-dim(newdata)
-sum(is.na(newdata))
-dft <- data.table(newdata)
-#2 Missing value Handling
-#Remove employee with >= 17 attributes with missing values
-dim(dft)
-removeEmp = c()
-res = 0
-sum(is.na(dft))
-dim(dft)
-for (row in 1:146){
-  k <- sum(is.na(dft[row]))
-  res = res+k
-  if(sum(is.na(dft[row]))>=17) {
-    removeEmp <- append(removeEmp,row)
-  }
-}
-print(res)
-length(removeEmp)
-if (length(removeEmp) !=0){
-  dft <- dft[-removeEmp]
-}
 
-library("mice")
+# No more missing data. Start SMOTE
+sampled_data <- ovun.sample(poi ~ ., data=processedData, p = 0.5, seed=123, method = "both", N = 10000)$data
 
-#Remove attribute which have so many NAN value(>75%) ”deferral_payments”, “loan_advances”, ”restricted_stock_deferred”, ”director_fees”
-threshold = 0.75*dim(dft)[1]
-dft <- as.data.frame(dft)
-dim(dft)
-a <- dft[,(colSums(is.na(dft)) <= threshold)]
-dim(a)
-nhanes
-md.pattern(nhanes)
+# feature engineering, skip  
+
+
+
+# Linear regression
+dim(sampled_data)
+nums <- unlist(lapply(sampled_data, is.numeric)) # only the numeric is used to predict 
+numData <- sampled_data[nums]
+tmpPoi <- sampled_data$poi
+numData <- cbind(numData,tmpPoi)
+numData$tmpPoi[numData$tmpPoi=="True"] <- 1 # change character to numeric
+numData$tmpPoi[numData$tmpPoi=="False"] <- 0
+# split data now
+sampleSize <- floor(0.8*nrow(numData))
+train_ind <- sample(seq_len(nrow(numData)),size=sampleSize)
+train <- numData[train_ind,]
+test <- numData[-train_ind,]
+
+lmTest = lm(tmpPoi~ .,data=train) # Linear regression
+summary(lmTest)
+distPred <- predict(lmTest,test)
+actual_preds <- data.frame(cbind(actuals=numData$tmpPoi,predicteds=distPred))
+correlation_accuracy <- cor(x=as.numeric(actual_preds$actuals),y=as.numeric(actual_preds$predicteds))
+(correlation_accuracy)
+
+
+
+
+
+
+
+# logistic regression
+
+
+# support vector machine
+
+
+# random forest
+
+
 
 
