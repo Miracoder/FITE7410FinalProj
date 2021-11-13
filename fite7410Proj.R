@@ -42,7 +42,7 @@ str(dataset)
 #Numbers of POI's and non-poi
 table(dataset$poi)
 table(dataset$poi)/length(dataset$poi)
-
+attributes(dataset)
 # Analysis of distribution of poi labels
 ggplot(data =dataset, aes(x= factor(poi),
                           y=prop.table(stat(count)),fill= factor(poi),
@@ -150,6 +150,17 @@ colSums(is.na(processedData))
 # No more missing data. Start SMOTE
 sampled_data <- ovun.sample(poi ~ ., data=processedData, p = 0.5, seed=123, method = "both", N = 10000)$data
 
+# test data
+nums <- unlist(lapply(processedData, is.numeric)) # only the numeric is used to predict 
+tmpTestData <- processedData[nums]
+tmpPoi <- processedData$poi
+tmpPoi <- gsub("False","0",tmpPoi)
+tmpPoi <- gsub("True","1",tmpPoi)
+tmpPoi=as.factor(tmpPoi)
+tmpPoi
+tmpTestData$tmpPoi <- tmpPoi
+test <- tmpTestData
+
 # feature engineering, skip  
 
 
@@ -159,14 +170,28 @@ dim(sampled_data)
 nums <- unlist(lapply(sampled_data, is.numeric)) # only the numeric is used to predict 
 numData <- sampled_data[nums]
 tmpPoi <- sampled_data$poi
-numData <- cbind(numData,tmpPoi)
-numData$tmpPoi[numData$tmpPoi=="True"] <- 1 # change character to numeric
-numData$tmpPoi[numData$tmpPoi=="False"] <- 0
+tmpPoi <- gsub("False","0",tmpPoi)
+tmpPoi <- gsub("True","1",tmpPoi)
+
+
+length(tmpPoi)
+tmpPoi=as.factor(tmpPoi)
+# tmpPoi <- as.numeric(tmpPoi)
+
+tmpPoi
+
+numData$tmpPoi <- tmpPoi
+# numData <- cbind(numData,tmpPoi)
+# numData$tmpPoi[numData$tmpPoi=="True"] <- as.numeric(1) # change character to numeric
+# numData$tmpPoi[numData$tmpPoi=="False"] <- as.numeric(0)
+
 # split data now
-sampleSize <- floor(0.8*nrow(numData))
-train_ind <- sample(seq_len(nrow(numData)),size=sampleSize)
-train <- numData[train_ind,]
-test <- numData[-train_ind,]
+# sampleSize <- floor(0.8*nrow(numData))
+# train_ind <- sample(seq_len(nrow(numData)),size=sampleSize)
+# train <- numData[train_ind,]
+# test <- numData[-train_ind,]
+train <- numData
+
 
 lmTest = lm(tmpPoi~ .,data=train) # Linear regression
 summary(lmTest)
@@ -182,6 +207,24 @@ correlation_accuracy <- cor(x=as.numeric(actual_preds$actuals),y=as.numeric(actu
 
 
 # logistic regression
+summary(train)
+train[1,]
+
+logistic <- glm(tmpPoi~.,data=train,family="binomial")
+summary(logistic)
+model2 <- step(object=logistic,trace=0)
+summary(model2)
+
+anova(object=model2,test="Chisq") # don't understand
+prob <- predict(object=model2,newdata = test,type="response")
+pred<-ifelse(prob>=0.5,"yes","no")
+length(pred)
+pred <- factor(pred,levels=c("no","yes"),order=TRUE)
+table(pred)
+talbe(test$tmpPoi)
+f <- table(test$tmpPoi,pred)
+f
+
 
 
 # support vector machine
