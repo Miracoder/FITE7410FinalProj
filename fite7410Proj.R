@@ -193,12 +193,12 @@ numData$tmpPoi <- tmpPoi
 train <- numData
 
 
-lmTest = lm(tmpPoi~ .,data=train) # Linear regression
-summary(lmTest)
-distPred <- predict(lmTest,test)
-actual_preds <- data.frame(cbind(actuals=numData$tmpPoi,predicteds=distPred))
-correlation_accuracy <- cor(x=as.numeric(actual_preds$actuals),y=as.numeric(actual_preds$predicteds))
-(correlation_accuracy)
+# lmTest = lm(tmpPoi~ .,data=train) # Linear regression
+# summary(lmTest)
+# distPred <- predict(lmTest,test)
+# actual_preds <- data.frame(cbind(actuals=numData$tmpPoi,predicteds=distPred))
+# correlation_accuracy <- cor(x=as.numeric(actual_preds$actuals),y=as.numeric(actual_preds$predicteds))
+# (correlation_accuracy)
 
 
 
