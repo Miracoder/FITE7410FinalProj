@@ -10,9 +10,9 @@ library(corrplot)
 install.packages('PerformanceAnalytics')
 library(PerformanceAnalytics)
 library(knitr)
-#安装VIM和mice�?
+#å®‰è£…VIMå’ŒmiceåŒ?
 install.packages(c("VIM","mice")) 
-# 载入VIM和mice�?
+# è½½å…¥VIMå’ŒmiceåŒ?
 library(VIM)
 library(mice)
 install.packages('Hmisc')
@@ -26,6 +26,8 @@ library(DescTools)
 library(DMwR)
 library(ROSE)
 
+backup_options <- options()
+
 setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 path = "./enron.csv"
 dataset = read.csv(path)
@@ -33,7 +35,7 @@ dataset = read.csv(path)
 #dataset = read.csv("/Users/hezhihao/hku-work/Financial Fraud/dataset/enron.csv")
 
 #1 EDA part
-dim(dataset)  #查看数据行列�?
+dim(dataset)  #æŸ¥çœ‹æ•°æ®è¡Œåˆ—æ•?
 summary(dataset)
 str(dataset)
 
@@ -58,9 +60,9 @@ ggplot(data =dataset, aes(x= factor(poi),
 
 
 #we can distribute it into 3 categories:
-#Financial : [‘salary�?, ‘bonus�?, ‘long_term_incentive�?, ‘deferred_income�?, ‘deferral_payments�?, ‘loan_advances�?, ‘other�?, ‘expenses�?, ‘director_fees’]
-#Stock : [‘exercised_stock_options�?, ‘restricted_stock�?, ‘restricted_stock_deferred’]
-#Total Payments : [‘total_payments�?,’total_stock_value’]
+#Financial : [â€˜salaryâ€?, â€˜bonusâ€?, â€˜long_term_incentiveâ€?, â€˜deferred_incomeâ€?, â€˜deferral_paymentsâ€?, â€˜loan_advancesâ€?, â€˜otherâ€?, â€˜expensesâ€?, â€˜director_feesâ€™]
+#Stock : [â€˜exercised_stock_optionsâ€?, â€˜restricted_stockâ€?, â€˜restricted_stock_deferredâ€™]
+#Total Payments : [â€˜total_paymentsâ€?,â€™total_stock_valueâ€™]
 
 #view the NAN distribution
 dataset[!complete.cases(dataset),]
@@ -97,7 +99,7 @@ if (length(removeEmp) !=0){
 }
 
 
-#Remove attribute which have so many NAN value(>75%) ”deferral_payments�?, “loan_advances�?, ”restricted_stock_deferred�?, ”director_fees�?
+#Remove attribute which have so many NAN value(>75%) â€deferral_paymentsâ€?, â€œloan_advancesâ€?, â€restricted_stock_deferredâ€?, â€director_feesâ€?
 threshold = 0.75*dim(dft)[1]
 dft <- as.data.frame(dft)
 dim(dft)
@@ -161,7 +163,60 @@ tmpPoi
 tmpTestData$tmpPoi <- tmpPoi
 test <- tmpTestData
 
-# feature engineering, skip  
+
+
+## (Xie) correlation based on processedData 
+data1 = processedData
+data1$poi = as.integer(as.logical(data1$poi))
+data1 = select_if(data1, is.numeric)
+corr_mat = cor(data1)
+
+corrplot(corr_mat, tl.cex=0.6, method="number", number.cex=0.5, order="hclust")
+# observe two groups of variables - financial / email-related
+
+
+# (Xie) feature engineering, skip  
+## Data Transformation - Normalization 
+sampled_data = select_if(sampled_data, is.numeric)
+data.scaled = scale(sampled_data)
+summary(data.scaled)
+
+## (Xie) PCA
+library(factoextra)
+data.pca = prcomp(data.scaled, scale = FALSE)
+summary(data.pca)
+prop_var_explained = data.pca$sdev^2 / sum(data.pca$sdev^2)
+
+# Show the percentage of variances explained by each principal component.
+p <- fviz_eig(data.pca,
+              addlabels = T, 
+              barcolor = "#E7B800", 
+              barfill = "#E7B800", 
+              linecolor = "#00AFBB", 
+              choice = "variance",
+              ylim = c(0, 65))
+
+y = cumsum(prop_var_explained)*100/1.5
+df <- data.frame(x=1:10,
+                 y=y[1:10])
+p <- p + 
+  geom_point(data=df, aes(x, y), size=2, color="#00AFBB") +
+  geom_line(data=df, aes(x, y), color="#00AFBB") +
+  scale_y_continuous(sec.axis = sec_axis(~ . * 1.5, 
+                                         name = "Cumulative proportion of Variance Explained") )
+print(p)
+
+# Graph of variables. Positive correlated variables point to the same side of the plot. 
+# Negative correlated variables point to opposite sides of the graph.
+options(ggrepel.max.overlaps = Inf)
+fviz_pca_var(data.pca, labelsize = 3,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+)
+options(backup_options)
+ 
+
 
 
 
