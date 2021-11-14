@@ -2,7 +2,10 @@
 library(ggplot2)
 install.packages('GGally')
 library(GGally)
+install.packages("randomForest")
+library(randomForest)
 library(scales)
+library(caret)
 install.packages('memisc')
 library(memisc)
 library(dplyr)
@@ -10,9 +13,7 @@ library(corrplot)
 install.packages('PerformanceAnalytics')
 library(PerformanceAnalytics)
 library(knitr)
-#å®‰è£…VIMå’ŒmiceåŒ?
 install.packages(c("VIM","mice")) 
-# è½½å…¥VIMå’ŒmiceåŒ?
 library(VIM)
 library(mice)
 install.packages('Hmisc')
@@ -25,17 +26,22 @@ library("tensr")
 library(DescTools)
 library(DMwR)
 library(ROSE)
+set.seed(123)
+
+# Buttons
+use_pca = FALSE
 
 backup_options <- options()
 
 setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 path = "./enron.csv"
 dataset = read.csv(path)
+
 # Load the data
 #dataset = read.csv("/Users/hezhihao/hku-work/Financial Fraud/dataset/enron.csv")
 
 #1 EDA part
-dim(dataset)  #æŸ¥çœ‹æ•°æ®è¡Œåˆ—æ•?
+dim(dataset)  
 summary(dataset)
 str(dataset)
 
@@ -60,9 +66,9 @@ ggplot(data =dataset, aes(x= factor(poi),
 
 
 #we can distribute it into 3 categories:
-#Financial : [â€˜salaryâ€?, â€˜bonusâ€?, â€˜long_term_incentiveâ€?, â€˜deferred_incomeâ€?, â€˜deferral_paymentsâ€?, â€˜loan_advancesâ€?, â€˜otherâ€?, â€˜expensesâ€?, â€˜director_feesâ€™]
-#Stock : [â€˜exercised_stock_optionsâ€?, â€˜restricted_stockâ€?, â€˜restricted_stock_deferredâ€™]
-#Total Payments : [â€˜total_paymentsâ€?,â€™total_stock_valueâ€™]
+#Financial : [â€˜salaryâ�??, â€˜bonusâ�??, â€˜long_term_incentiveâ�??, â€˜deferred_incomeâ�??, â€˜deferral_paymentsâ�??, â€˜loan_advancesâ�??, â€˜otherâ�??, â€˜expensesâ�??, â€˜director_feesâ€™]
+#Stock : [â€˜exercised_stock_optionsâ�??, â€˜restricted_stockâ�??, â€˜restricted_stock_deferredâ€™]
+#Total Payments : [â€˜total_paymentsâ�??,â€™total_stock_valueâ€™]
 
 #view the NAN distribution
 dataset[!complete.cases(dataset),]
@@ -98,14 +104,11 @@ if (length(removeEmp) !=0){
   dft <- dft[-removeEmp]
 }
 
-
-#Remove attribute which have so many NAN value(>75%) â€deferral_paymentsâ€?, â€œloan_advancesâ€?, â€restricted_stock_deferredâ€?, â€director_feesâ€?
+#Remove attribute which have so many NAN value(>75%) â€deferral_paymentsâ�??, â€œloan_advancesâ�??, â€restricted_stock_deferredâ�??, â€director_feesâ�??
 threshold = 0.75*dim(dft)[1]
 dft <- as.data.frame(dft)
 dim(dft)
 dft <- dft[,(colSums(is.na(dft)) < 123)]
-dim(a)
-md.pattern(a)
 naCols = colSums(is.na(dft))
 shres = sd(naCols)+mean(naCols)
 naCols[naCols>sd(naCols)
@@ -113,20 +116,33 @@ naCols[naCols>sd(naCols)
 l <- Large(naCols,5)
 newdata <- dft
 
-# MICE, solve missing data
+# numData means only numeric and poi, also scaled
+nums <- unlist(lapply(newdata, is.numeric)) # only the numeric is used to predict
+numData <- newdata[nums]
+summary(numData)
+poi <- dft$poi
+poi[poi=="False"] <- FALSE
+poi[poi=="True"] <- TRUE
+poi <- as.factor(poi)
+class(numData)
+numData$poi <- poi
 
-naCols <- colSums(is.na(newdata))
+# ind <- sapply(numData,is.numeric)
+# numData[ind] <- lapply(numData[ind],scale)
+
+# MICE, solve missing data. processedData means no missing, only numeric and poi
+
+naCols <- colSums(is.na(numData))
 naCols[naCols!=0]
 attributes(naCols)
-summary(newdata)
-processedData <- mice(newdata,m=5,maxit=50,meth='mean')
+summary(numData)
+processedData <- mice(numData,m=5,maxit=20,meth='norm')
 processedData <- complete(processedData,3)
 summary(processedData)
 colSums(is.na(processedData))
-
-
-# 
-# 
+test <- processedData
+ind <- sapply(test,is.numeric)
+test[ind] <- lapply(test[ind],scale)
 # salary_dis <- aggregate(x=newdata[c('salary')], by = list(newdata$poi), FUN=mean)
 # bonus_dis <- aggregate(x=newdata[c('bonus')], by = list(newdata$poi), FUN=mean)
 # long_term_incentive_dis <- aggregate(x=newdata[c('long_term_incentive')], by = list(newdata$poi), FUN=mean)
@@ -147,24 +163,39 @@ colSums(is.na(processedData))
 
 #from the above analysis, we could guess person of interest tend to have the higher values comparing to the non-poi's persons.
 
+# Linear regression
+# dim(sampled_data)
+# nums <- unlist(lapply(sampled_data, is.numeric)) # only the numeric is used to predict 
+# numData <- sampled_data[nums]
+# poi <- sampled_data$poi
+# poi <- gsub("False","0",poi)
+# poi <- gsub("True","1",poi)
+# 
+# 
+# length(poi)
+# poi=as.factor(poi)
+# poi
+# numData$poi <- poi
+# train <- numData
 
+# #  Get train data and test data
+# nums <- unlist(lapply(processedData, is.numeric)) # only the numeric is used to predict 
+# tmpTestData <- processedData[nums]
+# summary(tmpTestData)
+# poi <- processedData$poi
+# poi <- as.factor(poi)
+# class(tmpTestData)
+# tmpTestData$poi <- poi
+# test <- tmpTestData
+# summary(test)
 
-# No more missing data. Start SMOTE
-sampled_data <- ovun.sample(poi ~ ., data=processedData, p = 0.5, seed=123, method = "both", N = 10000)$data
+# No more missing data. Start SMOTE,sampled_data is the data sampled using MICE
+sampled_data <- ovun.sample(poi ~ ., data=processedData, p = 0.5, seed=123, method = "both", N = 2000)$data
+train <- sampled_data
+ind <- sapply(train,is.numeric)
+train[ind] <- lapply(train[ind],scale)
 
-# test data
-nums <- unlist(lapply(processedData, is.numeric)) # only the numeric is used to predict 
-tmpTestData <- processedData[nums]
-tmpPoi <- processedData$poi
-tmpPoi <- gsub("False","0",tmpPoi)
-tmpPoi <- gsub("True","1",tmpPoi)
-tmpPoi=as.factor(tmpPoi)
-tmpPoi
-tmpTestData$tmpPoi <- tmpPoi
-test <- tmpTestData
-
-
-
+str(train)
 ## (Xie) correlation based on processedData 
 data1 = processedData
 data1$poi = as.integer(as.logical(data1$poi))
@@ -175,10 +206,11 @@ corrplot(corr_mat, tl.cex=0.6, method="number", number.cex=0.5, order="hclust")
 # observe two groups of variables - financial / email-related
 
 
-# (Xie) feature engineering, skip  
+# (Xie) feature engineering  
 ## Data Transformation - Normalization 
-sampled_data = select_if(sampled_data, is.numeric)
-data.scaled = scale(sampled_data)
+numeric_sampled_data = select_if(sampled_data, is.numeric)
+data.scaled = scale(numeric_sampled_data)
+data.scaled
 summary(data.scaled)
 
 ## (Xie) PCA
@@ -215,78 +247,90 @@ fviz_pca_var(data.pca, labelsize = 3,
              repel = TRUE     # Avoid text overlapping
 )
 options(backup_options)
+data.pca
  
-
-
-
-
-# Linear regression
-dim(sampled_data)
-nums <- unlist(lapply(sampled_data, is.numeric)) # only the numeric is used to predict 
-numData <- sampled_data[nums]
-tmpPoi <- sampled_data$poi
-tmpPoi <- gsub("False","0",tmpPoi)
-tmpPoi <- gsub("True","1",tmpPoi)
-
-
-length(tmpPoi)
-tmpPoi=as.factor(tmpPoi)
-# tmpPoi <- as.numeric(tmpPoi)
-
-tmpPoi
-
-numData$tmpPoi <- tmpPoi
-# numData <- cbind(numData,tmpPoi)
-# numData$tmpPoi[numData$tmpPoi=="True"] <- as.numeric(1) # change character to numeric
-# numData$tmpPoi[numData$tmpPoi=="False"] <- as.numeric(0)
-
-# split data now
-# sampleSize <- floor(0.8*nrow(numData))
-# train_ind <- sample(seq_len(nrow(numData)),size=sampleSize)
-# train <- numData[train_ind,]
-# test <- numData[-train_ind,]
-train <- numData
-
-
-# lmTest = lm(tmpPoi~ .,data=train) # Linear regression
-# summary(lmTest)
-# distPred <- predict(lmTest,test)
-# actual_preds <- data.frame(cbind(actuals=numData$tmpPoi,predicteds=distPred))
-# correlation_accuracy <- cor(x=as.numeric(actual_preds$actuals),y=as.numeric(actual_preds$predicteds))
-# (correlation_accuracy)
-
-
-
-
-
-
 
 # logistic regression
 summary(train)
-train[1,]
 
-logistic <- glm(tmpPoi~.,data=train,family="binomial")
-summary(logistic)
-model2 <- step(object=logistic,trace=0)
-summary(model2)
+if (use_pca) {
+  logistic_train_pca <- data.frame(poi=train[,"poi"],data.pca$x[,1:7])
+  
+  logistic <- glm(poi~.,data=logistic_train_pca,family="binomial")
+  summary(logistic)
+  logistic <- step(object=logistic,trace=0)
+  summary(logistic)
+  
+  test.logisticPCA <- predict(data.pca, newdata = test)
+  head(test.logisticPCA)
+  
+  # predict class now
+  prob <- predict(logistic, newdata = data.frame(test.logisticPCA[,1:7]),type="response")
+  
+  #anova(object=test.logisticPCA,test="Chisq") # don't understand
+} else {
+  logistic <- glm(poi~.,data=train,family="binomial")
+  summary(logistic)
+  logistic <- step(object=logistic,trace=0)
+  summary(logistic)
 
-anova(object=model2,test="Chisq") # don't understand
-prob <- predict(object=model2,newdata = test,type="response")
-pred<-ifelse(prob>=0.5,"yes","no")
+  # predict class now
+  prob <- predict(object=logistic,newdata = test,type="response")
+  
+  anova(object=logistic,test="Chisq") # don't understand  
+}
+
+
+# test LR
+pred<-ifelse(prob<0.5,FALSE,TRUE)
 length(pred)
-pred <- factor(pred,levels=c("no","yes"),order=TRUE)
+pred <- factor(pred,levels=c(FALSE,TRUE),order=TRUE)
 table(pred)
-talbe(test$tmpPoi)
-f <- table(test$tmpPoi,pred)
+table(test$poi)
+f <- table(test$poi,pred)
 f
-
-
+confusionMatrix(reference=test$poi,data=pred)
 
 # support vector machine
 
 
-# random forest
+# RANDOM FOREST
 
+# data.rfImputed <- rfImpute(poi~.,data=numData,iter=20)
+# data.balanced_rfImputed <- ovun.sample(poi ~ ., data=data.rfImputed, p = 0.5, seed=123, method = "both", N = 10000)$data
+data.rfImputed <- processedData
+rfModel <- randomForest(poi~.,data=data.rfImputed,proximity=TRUE)
+rfModel
 
+oob.error.data <- data.frame(
+  Trees=rep(1:nrow(rfModel$err.rate), times=3),
+  Type=rep(c("OOB", "TRUE", "FALSE"), each=nrow(rfModel$err.rate)),
+  Error=c(rfModel$err.rate[,"OOB"], 
+          rfModel$err.rate[,"TRUE"], 
+          rfModel$err.rate[,"FALSE"]))
 
+ggplot(data=oob.error.data, aes(x=Trees, y=Error)) +
+  geom_line(aes(color=Type))
 
+distance.matrix <- as.dist(1-rfModel$proximity)
+
+mds.stuff <- cmdscale(distance.matrix, eig=TRUE, x.ret=TRUE)
+
+## calculate the percentage of variation that each MDS axis accounts for...
+mds.var.per <- round(mds.stuff$eig/sum(mds.stuff$eig)*100, 1)
+
+## now make a fancy looking plot that shows the MDS axes and the variation:
+mds.values <- mds.stuff$points
+mds.data <- data.frame(Sample=rownames(mds.values),
+                       X=mds.values[,1],
+                       Y=mds.values[,2],
+                       Status=data.rfImputed$poi)
+
+ggplot(data=mds.data, aes(x=X, y=Y, label=Sample)) + 
+  geom_text(aes(color=Status)) +
+  theme_bw() +
+  xlab(paste("MDS1 - ", mds.var.per[1], "%", sep="")) +
+  ylab(paste("MDS2 - ", mds.var.per[2], "%", sep="")) +
+  ggtitle("MDS plot using (1 - Random Forest Proximities)")
+
+# more detection model
