@@ -126,7 +126,7 @@ naCols <- colSums(is.na(numData))
 naCols[naCols!=0]
 attributes(naCols)
 summary(numData)
-processedData <- mice(numData,m=5,maxit=20,meth='norm')
+processedData <- mice(numData,m=5,maxit=20,meth='mean')
 processedData <- complete(processedData,3)
 summary(processedData)
 colSums(is.na(processedData))
