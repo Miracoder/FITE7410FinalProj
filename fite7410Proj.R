@@ -42,6 +42,7 @@ dim(dataset)
 summary(dataset)
 str(dataset)
 
+print("hello world")
 #We have 21 features and most of them are numeric information besides the email_address 
 #that represents the email of the user.
 #Numbers of POI's and non-poi
