@@ -37,9 +37,6 @@ setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 path = "./enron.csv"
 dataset = read.csv(path)
 
-# Load the data
-#dataset = read.csv("/Users/hezhihao/hku-work/Financial Fraud/dataset/enron.csv")
-
 #1 EDA part
 dim(dataset)  
 summary(dataset)
@@ -64,25 +61,18 @@ ggplot(data =dataset, aes(x= factor(poi),
   labs (x='isFraud' ,y='Percentage')+
   ggtitle("Distribution of poi labels")
 
-
-#we can distribute it into 3 categories:
-#Financial : [â€˜salaryâ�??, â€˜bonusâ�??, â€˜long_term_incentiveâ�??, â€˜deferred_incomeâ�??, â€˜deferral_paymentsâ�??, â€˜loan_advancesâ�??, â€˜otherâ�??, â€˜expensesâ�??, â€˜director_feesâ€™]
-#Stock : [â€˜exercised_stock_optionsâ�??, â€˜restricted_stockâ�??, â€˜restricted_stock_deferredâ€™]
-#Total Payments : [â€˜total_paymentsâ�??,â€™total_stock_valueâ€™]
-
 #view the NAN distribution
 dataset[!complete.cases(dataset),]
 sum(is.na(dataset))
 aggr(dataset,prop=FALSE,numbers=T)
 
-# insert mean value to each column that is important
+# use data table
 newdata<-dataset
 
 library(data.table)
 dim(newdata)
 sum(is.na(newdata))
 dft <- data.table(newdata)
-
 
 #2 Missing value Handling
 #Remove employee with >= 17 attributes with missing values
@@ -104,7 +94,7 @@ if (length(removeEmp) !=0){
   dft <- dft[-removeEmp]
 }
 
-#Remove attribute which have so many NAN value(>75%) â€deferral_paymentsâ�??, â€œloan_advancesâ�??, â€restricted_stock_deferredâ�??, â€director_feesâ�??
+#Remove attribute which have so many NAN value(>75%) 
 threshold = 0.75*dim(dft)[1]
 dft <- as.data.frame(dft)
 dim(dft)
@@ -116,7 +106,7 @@ naCols[naCols>sd(naCols)
 l <- Large(naCols,5)
 newdata <- dft
 
-# numData means only numeric and poi, also scaled
+# numData = data only numeric and poi
 nums <- unlist(lapply(newdata, is.numeric)) # only the numeric is used to predict
 numData <- newdata[nums]
 summary(numData)
@@ -127,10 +117,10 @@ poi <- as.factor(poi)
 class(numData)
 numData$poi <- poi
 
-# ind <- sapply(numData,is.numeric)
-# numData[ind] <- lapply(numData[ind],scale)
 
-# MICE, solve missing data. processedData means no missing, only numeric and poi
+# MICE, solve missing data. 
+# processedData = data no missing, only numeric and poi
+# test = numeric and poi data, scaled
 
 naCols <- colSums(is.na(numData))
 naCols[naCols!=0]
@@ -143,59 +133,24 @@ colSums(is.na(processedData))
 test <- processedData
 ind <- sapply(test,is.numeric)
 test[ind] <- lapply(test[ind],scale)
-# salary_dis <- aggregate(x=newdata[c('salary')], by = list(newdata$poi), FUN=mean)
-# bonus_dis <- aggregate(x=newdata[c('bonus')], by = list(newdata$poi), FUN=mean)
-# long_term_incentive_dis <- aggregate(x=newdata[c('long_term_incentive')], by = list(newdata$poi), FUN=mean)
-# deferred_income_dis <- aggregate(x=newdata[c('deferred_income')], by = list(newdata$poi), FUN=mean)
-# deferral_payments_dis <- aggregate(x=newdata[c('deferral_payments')], by = list(newdata$poi), FUN=mean)
-# expenses_dis <- aggregate(x=newdata[c('expenses')], by = list(newdata$poi), FUN=mean)
-# loan_advances_dis <- aggregate(x=newdata[c('loan_advances')], by = list(newdata$poi), FUN=mean)
-
-#we can see that:
-#poi        salary     bonus       long_term_incentive     deferred_income     deferral_payments
-#False     467888.2    1634285        900750.8               -459969.6           647226.8
-#True       376586.6    1929930         950586.6             -694832.9          308683.8
-
-#expenses   loan_advances
-#90984.12    41458105
-#59873.83    43971528
-
-
-#from the above analysis, we could guess person of interest tend to have the higher values comparing to the non-poi's persons.
-
-# Linear regression
-# dim(sampled_data)
-# nums <- unlist(lapply(sampled_data, is.numeric)) # only the numeric is used to predict 
-# numData <- sampled_data[nums]
-# poi <- sampled_data$poi
-# poi <- gsub("False","0",poi)
-# poi <- gsub("True","1",poi)
-# 
-# 
-# length(poi)
-# poi=as.factor(poi)
-# poi
-# numData$poi <- poi
-# train <- numData
-
-# #  Get train data and test data
-# nums <- unlist(lapply(processedData, is.numeric)) # only the numeric is used to predict 
-# tmpTestData <- processedData[nums]
-# summary(tmpTestData)
-# poi <- processedData$poi
-# poi <- as.factor(poi)
-# class(tmpTestData)
-# tmpTestData$poi <- poi
-# test <- tmpTestData
-# summary(test)
 
 # No more missing data. Start SMOTE,sampled_data is the data sampled using MICE
+# train = sampled scaled data for training
 sampled_data <- ovun.sample(poi ~ ., data=processedData, p = 0.5, seed=123, method = "both", N = 2000)$data
 train <- sampled_data
 ind <- sapply(train,is.numeric)
 train[ind] <- lapply(train[ind],scale)
 
 str(train)
+
+# ======================== Feature Engineering  ===========================
+# processedData = no missing data
+# sampled_data = sampled, no missing data
+# train = sampled, no missing, scaled data
+# test = original but scaled, no missing data
+
+
+
 ## (Xie) correlation based on processedData 
 data1 = processedData
 data1$poi = as.integer(as.logical(data1$poi))
@@ -249,6 +204,14 @@ fviz_pca_var(data.pca, labelsize = 3,
 options(backup_options)
 data.pca
  
+
+# ======================= Detection model ===========================
+# processedData = no missing data
+# sampled_data = sampled, no missing data
+# train = sampled, no missing, scaled data
+# test = original but scaled, no missing data
+# Please notice some method doesn't need sampling or scaling.
+
 
 # logistic regression
 summary(train)
