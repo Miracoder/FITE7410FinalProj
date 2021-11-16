@@ -1,31 +1,32 @@
-#/Users/hezhihao/hku-work/Financial Fraud/dataset/enron.csv
+# install.packages('GGally')
+# install.packages("randomForest")
+# install.packages('memisc')
+# install.packages('PerformanceAnalytics')
+# install.packages(c("VIM","mice")) 
+# install.packages('Hmisc')
+# install.packages("tensr")
+# install.packages("DescTools")
+# install.packages("DMwR")
+
 library(ggplot2)
-install.packages('GGally')
 library(GGally)
-install.packages("randomForest")
 library(randomForest)
 library(scales)
 library(caret)
-install.packages('memisc')
 library(memisc)
 library(dplyr)
 library(corrplot)
-install.packages('PerformanceAnalytics')
 library(PerformanceAnalytics)
 library(knitr)
-install.packages(c("VIM","mice")) 
 library(VIM)
 library(mice)
-install.packages('Hmisc')
-install.packages("tensr")
-install.packages("DescTools")
-install.packages("DMwR")
 library(Hmisc)
 library("mice")
 library("tensr")
 library(DescTools)
-library(DMwR)
+library(DMwR2)
 library(ROSE)
+require(caret)
 set.seed(123)
 
 # Buttons
@@ -42,7 +43,6 @@ dim(dataset)
 summary(dataset)
 str(dataset)
 
-print("hello world")
 #We have 21 features and most of them are numeric information besides the email_address 
 #that represents the email of the user.
 #Numbers of POI's and non-poi
@@ -114,8 +114,8 @@ summary(numData)
 poi <- dft$poi
 poi[poi=="False"] <- FALSE
 poi[poi=="True"] <- TRUE
-poi <- as.factor(poi)
-class(numData)
+poi <- factor(poi,levels=c(TRUE,FALSE))
+poi
 numData$poi <- poi
 
 
@@ -127,28 +127,38 @@ naCols <- colSums(is.na(numData))
 naCols[naCols!=0]
 attributes(naCols)
 summary(numData)
-processedData <- mice(numData,m=5,maxit=20,meth='norm')
+processedData <- mice(numData,m=5,maxit=20,meth='mean')
 processedData <- complete(processedData,3)
 summary(processedData)
 colSums(is.na(processedData))
-test <- processedData
+# test <- processedData
+
+# Before sampling the data, split the dataset
+smp_size <- floor(0.75 * nrow(processedData))
+train_ind <- sample(seq_len(nrow(processedData)), size = smp_size)
+train_unsampled <- processedData[train_ind, ]
+ind <- sapply(train_unsampled,is.numeric)
+train_unsampled[ind] <- lapply(train_unsampled[ind],scale)
+test <- processedData[-train_ind, ]
 ind <- sapply(test,is.numeric)
 test[ind] <- lapply(test[ind],scale)
+table(test$poi)
 
 # No more missing data. Start SMOTE,sampled_data is the data sampled using MICE
 # train = sampled scaled data for training
-sampled_data <- ovun.sample(poi ~ ., data=processedData, p = 0.5, seed=123, method = "both", N = 2000)$data
+sampled_data <- ovun.sample(poi ~ ., data=train_unsampled, p = 0.5, seed=123, method = "both", N = 2000)$data
+sampled_data$poi <- factor(sampled_data$poi,levels=c("TRUE","FALSE"))
 train <- sampled_data
 ind <- sapply(train,is.numeric)
 train[ind] <- lapply(train[ind],scale)
 
 str(train)
-
+summary(test)
 # ======================== Feature Engineering  ===========================
 # processedData = no missing data
 # sampled_data = sampled, no missing data
 # train = sampled, no missing, scaled data
-# test = original but scaled, no missing data
+# test =  scaled, no missing test data
 
 
 
@@ -164,9 +174,10 @@ corrplot(corr_mat, tl.cex=0.6, method="number", number.cex=0.5, order="hclust")
 
 # (Xie) feature engineering  
 ## Data Transformation - Normalization 
-numeric_sampled_data = select_if(sampled_data, is.numeric)
-data.scaled = scale(numeric_sampled_data)
-data.scaled
+processedData_X = select_if(processedData, is.numeric)
+data.scaled.X = as.data.frame(scale(processedData_X))
+data.scaled = data.scaled.X
+data.scaled$poi = processedData$poi
 summary(data.scaled)
 
 ## (Xie) PCA
@@ -204,65 +215,121 @@ fviz_pca_var(data.pca, labelsize = 3,
 )
 options(backup_options)
 data.pca
- 
 
-# ======================= Detection model ===========================
+
+# ======================= Detection model =========================== 
 # processedData = no missing data
 # sampled_data = sampled, no missing data
+# train_unsampled = unsampled, no missing, scaled train data
 # train = sampled, no missing, scaled data
-# test = original but scaled, no missing data
+# test =  unsampled, no missing, scaled test data
 # Please notice some method doesn't need sampling or scaling.
 
 
 # logistic regression
 summary(train)
 
-if (use_pca) {
-  logistic_train_pca <- data.frame(poi=train[,"poi"],data.pca$x[,1:7])
-  
-  logistic <- glm(poi~.,data=logistic_train_pca,family="binomial")
-  summary(logistic)
-  logistic <- step(object=logistic,trace=0)
-  summary(logistic)
-  
-  test.logisticPCA <- predict(data.pca, newdata = test)
-  head(test.logisticPCA)
-  
-  # predict class now
-  prob <- predict(logistic, newdata = data.frame(test.logisticPCA[,1:7]),type="response")
-  
-  #anova(object=test.logisticPCA,test="Chisq") # don't understand
-} else {
-  logistic <- glm(poi~.,data=train,family="binomial")
-  summary(logistic)
-  logistic <- step(object=logistic,trace=0)
-  summary(logistic)
+# if (use_pca) {
+#   logistic_train_pca <- data.frame(poi=train[,"poi"],data.pca$x[,1:7])
+#   
+#   logistic <- glm(poi~.,data=logistic_train_pca,family="binomial")
+#   summary(logistic)
+#   logistic <- step(object=logistic,trace=0)
+#   summary(logistic)
+#   
+#   test.logisticPCA <- predict(data.pca, newdata = test)
+#   head(test.logisticPCA)
+#   
+#   # predict class now
+#   prob <- predict(logistic, newdata = data.frame(test.logisticPCA[,1:7]),type="response")
+#   
+#   #anova(object=test.logisticPCA,test="Chisq") # don't understand
+# } else {
+#   logistic <- glm(poi~.,data=train,family="binomial")
+#   summary(logistic)
+#   logistic <- step(object=logistic,trace=0)
+#   summary(logistic)
+# 
+#   # predict class now
+#   prob <- predict(object=logistic,newdata = test,type="response")
+#   
+#   anova(object=logistic,test="Chisq") # don't understand  
+# }
 
-  # predict class now
-  prob <- predict(object=logistic,newdata = test,type="response")
-  
-  anova(object=logistic,test="Chisq") # don't understand  
-}
+# k cross validation LR
+set.seed(12345678)
+fitControl <- trainControl(method="cv",number=10)
+model_LR_cv <- train(poi~.,data=train,method="bayesglm",
+                     family="binomial",trControl=fitControl)
+summary(model_LR_cv)
 
+# confusionMatrix(table((model_LR_cv$pred),model_LR_cv$obs))
+model_LR_cv
+pred <- predict(object=model_LR_cv,newdata=test)
+confusionMatrix(table(test[,"poi"],pred))
+plot(model_LR_cv)
+model_LR_cv$finalModel
 
 # test LR
-pred<-ifelse(prob<0.5,FALSE,TRUE)
-length(pred)
-pred <- factor(pred,levels=c(FALSE,TRUE),order=TRUE)
-table(pred)
-table(test$poi)
-f <- table(test$poi,pred)
-f
-confusionMatrix(reference=test$poi,data=pred)
+# pred<-ifelse(prob<0.5,FALSE,TRUE)
+# length(pred)
+# pred <- factor(pred,levels=c(FALSE,TRUE),order=TRUE)
+# table(pred)
+# table(test$poi)
+# f <- table(test$poi,pred)
+# f
+# confusionMatrix(reference=test$poi,data=pred)
 
 # support vector machine
+
+
+# # KNN
+# model_knn_cv = train(
+#   poi ~ .,
+#   data = train,
+#   method = "knn",
+#   trControl = fitControl, 
+#   tuneGrid = expand.grid(k = seq(1, 20, by = 1)))
+# 
+# summary(model_knn_cv)
+# 
+# get_best_result = function(caret_fit) {
+#   best = which(rownames(caret_fit$results) == rownames(caret_fit$bestTune))
+#   best_result = caret_fit$results[best, ]
+#   rownames(best_result) = NULL
+#   best_result
+# }
+# 
+# get_best_result(model_knn_cv)
+# model_knn_cv$finalModel
+
+
+
+# Naive Bayes
+classifier_cl <- naiveBayes(poi ~ ., data = train)
+classifier_cl
+y_pred <- predict(classifier_cl, newdata = test)
+cm <- table(test$poi, y_pred)
+confusionMatrix(cm)
+
+
+
+# library(e1071)
+# model_nb_cv = train(poi~., data=train, 'nb', trControl=fitControl)
+# model_nb_cv
+# pred <- predict(object=model_nb_cv$finalModel,newdata=test)
+# confusionMatrix(table(test[,"poi"],pred$class))
+
+
 
 
 # RANDOM FOREST
 
 # data.rfImputed <- rfImpute(poi~.,data=numData,iter=20)
 # data.balanced_rfImputed <- ovun.sample(poi ~ ., data=data.rfImputed, p = 0.5, seed=123, method = "both", N = 10000)$data
-data.rfImputed <- processedData
+# data.rfImputed <- processedData
+data.rfImputed <- rfImpute(poi ~ ., data = numData, iter=20)
+
 rfModel <- randomForest(poi~.,data=data.rfImputed,proximity=TRUE)
 rfModel
 
