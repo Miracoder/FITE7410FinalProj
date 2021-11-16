@@ -365,3 +365,44 @@ ggplot(data=mds.data, aes(x=X, y=Y, label=Sample)) +
   ggtitle("MDS plot using (1 - Random Forest Proximities)")
 
 # more detection model
+
+
+#Random Forest
+library(randomForest)
+library(dplyr)
+library(caret)
+
+dataset.rf<-data.frame(processedData)
+trainrf<-sample(nrow(dataset.rf), 0.7*nrow(dataset.rf), replace = FALSE)
+TrainSetrf<-dataset.rf[trainrf,]
+TestSetrf<-dataset.rf[-trainrf,]
+model_rf<-randomForest(poi ~ ., data=TrainSetrf, importance = TRUE)
+model_rf
+plot(model_rf)
+
+prediction_rf = predict(model_rf,TestSetrf)
+confusionMatrix(prediction_rf,TestSetrf$poi)
+
+
+#Decision tree Model
+library(party)
+input.data<-TrainSetrf[c(1:7)]
+output.tree<-ctree(TrainSetrf$poi~.,data = input.data)
+plot(output.tree)
+
+#grow tree
+library(rpart)
+model.dt<-rpart(TrainSetrf$poi~.,data = input.data,method = "class")
+predict.dt<-predict(model.dt,type = "class")
+table(predict.dt)
+
+#plot tree
+printcp(model.dt)
+plotcp(model.dt)
+summary(model.dt)
+
+predict.dt<-predict(model.dt,TestSetrf,type = "class")
+table(predict.dt)
+table.mat<- table(TestSetrf$poi,predict.dt)
+plot(table.mat)
+confusionMatrix(predict.dt,TestSetrf$poi)
