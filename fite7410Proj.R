@@ -477,3 +477,26 @@ print(paste('Accuracy =', 1-misClassError))
 
 
 
+
+#SVM Model
+smp.size = floor(0.8*nrow(processedData)) 
+set.seed(516)                     
+trainsvm.ind = sample(seq_len(nrow(processedData)), smp.size)
+trainsvm = processedData[trainsvm.ind, ] # 80%
+testsvm = processedData[-trainsvm.ind, ] # 20%
+
+model = svm(formula = poi ~ .,  
+            data = trainsvm)
+summary(model)
+trainsvm.pred = predict(model, trainsvm)
+testsvm.pred = predict(model, testsvm)
+
+#matrix for train data
+table(real=trainsvm$poi, predict=trainsvm.pred)
+confus.matrix = table(real=trainsvm$poi, predict=trainsvm.pred)
+sum(diag(confus.matrix))/sum(confus.matrix)
+
+#matrix for test data
+table(real=testsvm$poi, predict=testsvm.pred)
+confus.matrix = table(real=testsvm$poi, predict=testsvm.pred)
+sum(diag(confus.matrix))/sum(confus.matrix)
