@@ -406,3 +406,74 @@ table(predict.dt)
 table.mat<- table(TestSetrf$poi,predict.dt)
 plot(table.mat)
 confusionMatrix(predict.dt,TestSetrf$poi)
+
+
+
+
+
+#KNN Model
+# Installing Packages
+install.packages("e1071")
+install.packages("caTools")
+install.packages("class")
+
+# Loading package
+library(e1071)
+library(caTools)
+library(class)
+
+# Splitting data into train
+# and test data
+split <- sample.split(processedData, SplitRatio = 0.7)
+train_cl <- subset(processedData, split == "TRUE")
+test_cl <- subset(processedData, split == "FALSE")
+
+# Feature Scaling
+train_scale <- scale(train_cl[, 1:4])
+test_scale <- scale(test_cl[, 1:4])
+
+# Fitting KNN Model 
+# to training dataset
+classifier_knn <- knn(train = train_scale,
+                      test = test_scale,
+                      cl = train_cl$poi,
+                      k = 1)
+classifier_knn
+
+# Confusion Matrix
+cm <- table(test_cl$poi, classifier_knn)
+cm
+library(caret)
+confusionMatrix(classifier_knn,test_cl$poi)
+
+# Model Evaluation - Choosing K
+# Calculate out of Sample error
+misClassError <- mean(classifier_knn != test_cl$poi)
+print(paste('Accuracy =', 1-misClassError))
+
+# K = 3
+classifier_knn <- knn(train = train_scale,
+                      test = test_scale,
+                      cl = train_cl$poi,
+                      k = 3)
+misClassError <- mean(classifier_knn != test_cl$poi)
+print(paste('Accuracy =', 1-misClassError))
+
+# K = 5
+classifier_knn <- knn(train = train_scale,
+                      test = test_scale,
+                      cl = train_cl$poi,
+                      k = 5)
+misClassError <- mean(classifier_knn != test_cl$poi)
+print(paste('Accuracy =', 1-misClassError))
+
+# K = 7
+classifier_knn <- knn(train = train_scale,
+                      test = test_scale,
+                      cl = train_cl$poi,
+                      k = 7)
+misClassError <- mean(classifier_knn != test_cl$poi)
+print(paste('Accuracy =', 1-misClassError))
+
+
+
