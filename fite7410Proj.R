@@ -106,7 +106,7 @@ dim(dft)
 threshold = 0.75*dim(dft)[1]
 dft <- as.data.frame(dft)
 dim(dft)
-dft <- dft[,(colSums(is.na(dft)) < 123)]
+dft <- dft[,(colSums(is.na(dft)) < 109)]
 naCols = colSums(is.na(dft))
 shres = sd(naCols)+mean(naCols)
 naCols[naCols>sd(naCols)
