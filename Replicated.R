@@ -34,8 +34,8 @@ install.packages("party")
 library(party)
 
 set.seed(123)
-use_pca = FALSE
-partition = 5
+use_pca = TRUE
+partition = 3
 
 backup_options <- options()
 
@@ -152,6 +152,7 @@ options(backup_options)
 
 # create folds
 fold <- createFolds(numData$poi,k=partition,list=TRUE,returnTrain = FALSE)
+lengths(fold)
 
 # Self defined function
 evaluate_cm <- function(cm) {
@@ -163,7 +164,6 @@ evaluate_cm <- function(cm) {
 # Do MICE and ROSE on training folds, and MICE on test
 result_lr = c()
 result_rf = c()
-result_dt = c()
 result_nb = c()
 result_knn = c()
 result_svm = c()
@@ -230,25 +230,16 @@ for (i in 1:partition){
   cm_lr
   tmp_result_lr <- evaluate_cm(cm_lr)
   result_lr <- cbind(result_lr,tmp_result_lr)
-# 
-#   
-  # Random Forest doesn't work
-  model_rf<-randomForest(poi ~ ., data=train_unsampled_unscaled, importance = TRUE)
-  print(model_rf)
-  # plot(model_rf)
 
-  prediction_rf = predict(model_rf,test_unscaled)
-  cm_rf <- confusionMatrix(prediction_rf,test_unscaled$poi)
+  # Random Forest doesn't work
+  model_rf<-randomForest(poi ~ ., data=train, importance = TRUE)
+  print(model_rf)
+
+  prediction_rf = predict(model_rf,test)
+  cm_rf <- confusionMatrix(prediction_rf,test$poi)
   tmp_result_rf <- evaluate_cm(cm_rf)
   result_rf <- cbind(result_rf,tmp_result_rf)
 
-
-#   # Decision Tree doesn't make sense
-#   output.tree<-ctree(train_unsampled_unscaled$poi~.,data = train_unsampled_unscaled)
-#   summary(output.tree)
-#   plot(output.tree)
-#   
-#   
   # Naive Bayes
   model_nb <- naiveBayes(poi~.,data=train)
   pred_nb <- predict(model_nb, newdata=test)
@@ -294,18 +285,13 @@ for (i in 1:partition){
 # Transpose
 lr <- t(result_lr)
 rf <- t(result_rf)
-# dt <- t(result_dt) # To do 
 nb <- t(result_nb)
 knn <- t(result_knn)
 svm <- t(result_svm)
 
 # Print result
-
 summary(lr)
-lr
 summary(rf)
-# summary(dt)
 summary(nb)
-nb
 summary(knn)
 summary(svm)
