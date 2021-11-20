@@ -34,8 +34,9 @@ install.packages("party")
 library(party)
 
 set.seed(123)
-use_pca = TRUE
+use_pca = FALSE
 partition = 3
+upperBound <- 0.9
 
 backup_options <- options()
 
@@ -99,7 +100,7 @@ numData$poi <- poi
 colSums(is.na(numData))
 
 # MICE together
-numData_MICED <- mice(numData,m=5,maxit=20,meth='mean')
+numData_MICED <- mice(numData,m=5,maxit=20,meth='mean',print=F)
 numData_MICED <- complete(numData_MICED,1)
 colSums(is.na(numData_MICED))
 
@@ -194,10 +195,9 @@ for (i in 1:partition){
     data.onlyNumeric <- select_if(train,is.numeric)
     data.pca = prcomp(data.onlyNumeric, scale = FALSE)
     prop_var_explained = data.pca$sdev^2 / sum(data.pca$sdev^2)
-    upperBound <- 0.9
     curV <- 0
     pcaIdx <- 1
-    while(curV<0.9) {
+    while(curV<upperBound) {
       curV = curV + prop_var_explained[pcaIdx]
       pcaIdx <- pcaIdx+1
     }
@@ -231,7 +231,7 @@ for (i in 1:partition){
   tmp_result_lr <- evaluate_cm(cm_lr)
   result_lr <- cbind(result_lr,tmp_result_lr)
 
-  # Random Forest doesn't work
+  # Random Forest 
   model_rf<-randomForest(poi ~ ., data=train, importance = TRUE)
   print(model_rf)
 
@@ -253,12 +253,12 @@ for (i in 1:partition){
     model_knn <- knn(train = train[-c(1)],
                           test = test[-c(1)],
                           cl = train$poi,
-                          k = 25)
+                          k = 15)
   } else {
     model_knn <- knn(train = train[-c(16)],
                      test = test[-c(16)],
                      cl = train$poi,
-                     k = 25)
+                     k = 15)
   }
   model_knn <- factor(model_knn,levels=c(TRUE,FALSE))
   summary(model_knn)
@@ -271,6 +271,7 @@ for (i in 1:partition){
   # SVM Model
   model_svm <- svm(formula = poi ~ .,
                    data = train)
+  
   summary(model_svm)
   pred_svm_test <- predict(model_svm, test)
   pred_svm_test <- factor(pred_svm_test,levels=c(TRUE,FALSE))
